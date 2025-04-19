@@ -1,58 +1,113 @@
-/**
- * 互動事件處理器
- * 用於處理斜線命令和其他互動
- */
-const { getText } = require('../utils/localization'); // <--- 引入 getText
+const { Events } = require('discord.js');
 
 module.exports = {
-  name: 'interactionCreate',
-  on: true,
-  async execute(interaction, client) {
-    // 只處理斜線命令互動 / Only process slash command interactions
-    if (!interaction.isChatInputCommand()) return;
+    name: Events.InteractionCreate,
+    async execute(interaction) {
+        // 處理斜線命令
+        if (interaction.isChatInputCommand()) {
+            const command = interaction.client.commands.get(interaction.commandName);
 
-    // 獲取命令名稱 / Get command name
-    const commandName = interaction.commandName;
-    
-    try {
-      // 從命令集合中獲取命令 / Get command from collection
-      const command = client.commands.get(commandName);
-      
-      // 如果命令不存在 / If command doesn't exist
-      if (!command) {
-        console.log(`找不到命令 ${commandName}`);
-        // 只在互動尚未回應時嘗試回應 / Only try to reply if interaction hasn't been responded to
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({
-            content: getText('error_command_not_found'),
-            ephemeral: true
-          });
+            if (!command) {
+                console.error(`找不到命令 ${interaction.commandName}`);
+                return;
+            }
+
+            try {
+                await command.execute(interaction);
+            } catch (error) {
+                console.error(`執行命令 ${interaction.commandName} 時發生錯誤:`, error);
+                
+                // 如果交互還未回覆，發送錯誤消息
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({
+                        content: '執行此命令時發生錯誤！',
+                        ephemeral: true
+                    });
+                } else {
+                    // 如果已經回覆或延遲回覆，發送後續消息
+                    await interaction.followUp({
+                        content: '執行此命令時發生錯誤！',
+                        ephemeral: true
+                    });
+                }
+            }
         }
-        return;
-      }
-      
-      // 執行命令 / Execute command
-      await command.execute(interaction);
-      
-    } catch (error) {
-      console.error(`執行命令 ${commandName} 時發生錯誤:`, error);
-      
-      // 只在互動尚未回應時嘗試回應 / Only try to reply if interaction hasn't been responded to
-      try {
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({
-            content: getText('error_command_execution_generic'),
-            ephemeral: true
-          });
-        } else if (interaction.deferred && !interaction.replied) {
-          // 如果互動已延遲但未回應，則編輯回覆 / If interaction was deferred but not replied, edit the reply
-          await interaction.editReply({
-            content: getText('error_command_execution_generic')
-          });
+        // 處理按鈕交互
+        else if (interaction.isButton()) {
+            // 獲取按鈕的自定義ID
+            const buttonId = interaction.customId;
+            
+            try {
+                // 根據按鈕ID執行相應的處理邏輯
+                switch (buttonId) {
+                    case 'translate_button':
+                        // 處理翻譯按鈕點擊
+                        await handleTranslateButton(interaction);
+                        break;
+                    // 可以添加更多按鈕處理邏輯
+                    default:
+                        console.warn(`未知的按鈕ID: ${buttonId}`);
+                        await interaction.reply({
+                            content: '無法處理此按鈕操作。',
+                            ephemeral: true
+                        });
+                }
+            } catch (error) {
+                console.error('處理按鈕交互時發生錯誤:', error);
+                await interaction.reply({
+                    content: '處理您的請求時發生錯誤。',
+                    ephemeral: true
+                });
+            }
         }
-      } catch (replyError) {
-        console.error('回應錯誤時出現問題:', replyError);
-      }
-    }
-  }
+        // 處理選擇菜單交互
+        else if (interaction.isStringSelectMenu()) {
+            // 獲取選擇菜單的自定義ID
+            const menuId = interaction.customId;
+            
+            try {
+                // 根據選擇菜單ID執行相應的處理邏輯
+                switch (menuId) {
+                    case 'language_select':
+                        // 處理語言選擇
+                        await handleLanguageSelect(interaction);
+                        break;
+                    // 可以添加更多選擇菜單處理邏輯
+                    default:
+                        console.warn(`未知的選擇菜單ID: ${menuId}`);
+                        await interaction.reply({
+                            content: '無法處理此選擇。',
+                            ephemeral: true
+                        });
+                }
+            } catch (error) {
+                console.error('處理選擇菜單交互時發生錯誤:', error);
+                await interaction.reply({
+                    content: '處理您的請求時發生錯誤。',
+                    ephemeral: true
+                });
+            }
+        }
+    },
 };
+
+// 處理翻譯按鈕點擊的函數
+async function handleTranslateButton(interaction) {
+    // 實現翻譯按鈕的處理邏輯
+    await interaction.reply({
+        content: '翻譯功能正在開發中...',
+        ephemeral: true
+    });
+}
+
+// 處理語言選擇的函數
+async function handleLanguageSelect(interaction) {
+    // 獲取用戶選擇的值
+    const selectedLanguage = interaction.values[0];
+    
+    // 實現語言選擇的處理邏輯
+    await interaction.reply({
+        content: `您選擇了: ${selectedLanguage}`,
+        ephemeral: true
+    });
+}
